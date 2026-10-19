@@ -50,7 +50,7 @@ The root `package.json` uses `concurrently` and the root virtual environment at 
 
 ### 4. Bounded Crawler & Attack Surface (Phase 8)
 - Same-origin bounded crawler (`backend/scanner/crawler.py`).
-- Max depth (2-3), max pages (20-30), safe concurrency.
+- Scan runner uses max pages 20, max depth 2, concurrency 3 (hard-coded in `runner.py`; the class defaults are 30 pages / depth 3).
 - SSRF revalidation on every crawl request.
 - Automatic skipping of destructive links (`/logout`, `/delete`, etc.).
 - Extraction of forms, input parameters, query strings, and external domains.
@@ -75,8 +75,8 @@ The root `package.json` uses `concurrently` and the root virtual environment at 
 
 ### 7. Machine Learning Pipeline & Hybrid Analysis (Phases 13–21)
 - OWASP CRS & CSIC dataset pipeline:
-  - `ml/scripts/download_datasets.py`: Acquires canonical OWASP CRS v4.x patterns (SQLi: `REQUEST-942`, XSS: `REQUEST-941`) and CSIC 2010 benign traffic (2,000 raw samples).
-  - `ml/scripts/build_dataset.py`: Normalizes, categorizes, deduplicates, and assigns structural `group_id` hashes to prevent data leakage (1,853 clean samples across 1,046 groups).
+  - `ml/scripts/download_datasets.py`: Despite the name, downloads nothing. It generates 2,000 raw samples (600 SQLi / 600 XSS / 800 benign) from hand-written templates modelled loosely on OWASP CRS 941/942 and typical form parameters. See `docs/datasets.md`.
+  - `ml/scripts/build_dataset.py`: Normalizes, categorizes, deduplicates, and assigns `group_id` hashes (first 30 characters of the masked payload; 1,853 clean samples across 1,046 groups as recorded by the original run, not re-run). Near-duplicate variants can still cross splits.
   - `ml/scripts/split_dataset.py`: GroupShuffleSplit into Train (1,312), Val (268), and Test (273) with mathematically verified zero group overlap.
 - Model training & candidate comparison (`ml/scripts/train_model.py`):
   - Compared LogisticRegression, CalibratedLinearSVC, and SGDClassifier (Modified Huber) on Character TF-IDF (2–5 n-grams).
@@ -84,14 +84,15 @@ The root `package.json` uses `concurrently` and the root virtual environment at 
   - Serialized model: `ml/models/web_ids_model_v1.0.0.joblib` and `web_ids_model_v1.0.0.metadata.yaml`.
 - Independent test evaluation (`ml/scripts/evaluate_model.py`):
   - Evaluated on untouched 273 test samples.
-  - Test Accuracy: 100%, Macro F1: 1.0000, False Positive Rate: 0.00%.
+  - Test Accuracy: 100%, Macro F1: 1.0000, False Positive Rate: 0.00%. These are inflated because the data is template-generated (see `ml/reports/model_evaluation_report.md`, sections 5-6).
+  - External HttpParamsDataset result reported by the author: Macro F1 0.9483, Accuracy 97.23%. The evaluation is not in this repository.
   - Output report: `ml/reports/model_evaluation_report.md` and `ml/reports/model_evaluation_metrics.json`.
 - FastAPI model integration:
   - Real ML loader (`backend/ml/loader.py`) and predictor (`backend/ml/predictor.py`).
   - Model API router (`backend/api/routers/model.py`): `GET /api/model` and `POST /api/model/predict`.
 - Hybrid decision matrix (`backend/scanner/analysis/hybrid.py`):
-  - Hard safety invariant: ML alone can NEVER confirm a vulnerability without deterministic response proof.
-  - Elevates POTENTIAL findings to LIKELY or HYBRID based on probability thresholds.
+  - Safety invariant: ML alone never produces `CONFIRMED`; confirmation needs deterministic response evidence from the active scanner.
+  - Sets `detection_method=HYBRID` when the matching class probability is above 0.6, and raises `POTENTIAL` to `LIKELY` above 0.8 (`hybrid.py`).
 - Fast, deterministic finding fingerprints (`ts1:<sha256>`) and deduplication.
 - Posture score calculation (0–100) and letter grades (A–F).
 - Rescan comparison tracking (`NEW`, `UNCHANGED`, and `FIXED` counts).
@@ -120,18 +121,18 @@ The root `package.json` uses `concurrently` and the root virtual environment at 
 
 ## Verification Status
 
-All tests run and pass cleanly:
+Re-checked 2026-10-19 on `main` (`1f76df6`):
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest backend\tests -q
-# 83 passed, 3 warnings in ~14s
-
 npm --prefix apps/dashboard run test:run
-# 13 passed in 8 test files
+# 14 passed in 9 test files
 
-npm --prefix apps/dashboard run build
-# Production build succeeded without TypeScript or Vite errors in ~19s
+.\.venv\Scripts\python.exe -m pytest backend\tests -q
+# NOT re-run: the local .venv points at a Python path that does not exist on this machine
+# (the earlier 83-test figure was not verified here; recreate the venv and run it to get a current number)
 ```
+
+`npm --prefix apps/dashboard run build` was not re-run.
 
 ## Controlled Lab Verification & SSRF Boundary Fix
 - **Loopback Only (`backend/scanner/ssrf.py`)**: `allow_local` permits strictly `address.is_loopback` (`127.0.0.1`, `::1`, `localhost`). Non-loopback private networks (`192.168.x.x`, `10.x.x.x`) and cloud metadata (`169.254.169.254`) remain strictly rejected by SSRF validation.
