@@ -496,3 +496,12 @@ The active checks live in `backend/scanner/active/` (`sqli.py` and `reflected_xs
 ## License
 
 This project is licensed under the [MIT License](LICENSE) — free for educational, personal, and commercial security auditing use.
+
+## Author
+Kittipop Sanpho (กิตติภพ สารโพธิ์)
+GitHub:@kktpx
+
+Witthawat Simngam
+GitHub:@shiryx0242
+
+ © 2026 ThreatSentry License under MIT
