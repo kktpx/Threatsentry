@@ -26,8 +26,8 @@ Because train, validation and test all come from the same templates, the project
 
 ---
 
-## Ethical Boundaries & Separation Rule
-> **Hard Invariant:** The **OWASP Benchmark** is strictly prohibited from participating in any training, validation, or test dataset for the ML model. It is reserved exclusively for black-box evaluation of scanner performance to prevent target memorization and biased benchmark claims.
+## OWASP Benchmark
+The **OWASP Benchmark** is not used in any training, validation or test data, and no script in this repository uses it. The intent is to keep it for black-box evaluation of the scanner, to avoid target memorization. This is a project convention only; no code checks or enforces it.
 
 ---
 

@@ -155,7 +155,7 @@ The model achieved high discrimination accuracy while maintaining zero false pos
 ## 4. Leakage Verification & Boundary Integrity
 
 - **Train/Val/Test Leakage:** Verified 0 overlapping structural groups across splits.
-- **OWASP Benchmark Separation:** Strict invariant enforced—OWASP Benchmark is NOT included in the training or validation datasets.
+- **OWASP Benchmark:** Not used in the training, validation or test data. No code in this repository checks or enforces this.
 - **Deployment Status:** Serialized to `ml/models/web_ids_model_v1.0.0.joblib` and ready for production inference in the FastAPI backend.
 """
 
