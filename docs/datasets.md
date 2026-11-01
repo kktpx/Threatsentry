@@ -1,9 +1,11 @@
 # ThreatSentry — Dataset Documentation
 
 ## Overview
-ThreatSentry uses a hybrid detection engine combining deterministic protocol checks, response differential analysis, and a character-level Machine Learning classifier for classifying web inputs into three canonical classes:
+ThreatSentry combines deterministic checks (passive checks and two active probes) with a character-level Machine Learning classifier that labels request payloads into three classes. The classifier supports the scanner's findings; it does not replace them. The active SQL injection check compares the probe response with a baseline only for status changes (HTTP 200 to 500) and database error strings.
+
+The classifier's three classes:
 1. `NORMAL`: Benign web traffic, form values, URL query parameters, pagination, slugs, and everyday input.
-2. `SQLI`: Structured Query Language injection payloads across union-based, error-based, boolean-blind, and time-based variants.
+2. `SQLI`: SQL injection payloads. The training templates include union-based, error-based, boolean-blind and time-based examples, but the active scanner itself only tests error-based injection.
 3. `XSS`: Cross-Site Scripting vectors across raw tag injections, event handlers, attribute breakouts, and javascript pseudoprotocols.
 
 ---
@@ -26,8 +28,8 @@ Because train, validation and test all come from the same templates, the project
 
 ---
 
-## Ethical Boundaries & Separation Rule
-> **Hard Invariant:** The **OWASP Benchmark** is strictly prohibited from participating in any training, validation, or test dataset for the ML model. It is reserved exclusively for black-box evaluation of scanner performance to prevent target memorization and biased benchmark claims.
+## OWASP Benchmark
+The **OWASP Benchmark** is not used in any training, validation or test data, and no script in this repository uses it. The intent is to keep it for black-box evaluation of the scanner, to avoid target memorization. This is a project convention only; no code checks or enforces it.
 
 ---
 
