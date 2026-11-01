@@ -2,8 +2,8 @@
 
 **Model Version:** `web_ids_model_v1.0.0`  
 **Evaluation Date:** 2026-09-12  
-**Dataset Splits:** `GroupShuffleSplit` (70/15/15) on template-generated data (see `docs/datasets.md`)  
-**Leakage Control:** Zero `group_id` overlap between training and test sets (this does not rule out near-duplicate template variants; see section 6)  
+**Dataset Splits:** `GroupShuffleSplit` (70/15/15) on template-generated data (see `docs/datasets.md`)
+**Leakage Control:** Zero `group_id` overlap between training and test sets (this does not rule out near-duplicate template variants; see section 6)
 
 > Sections 1-4 are computed by `ml/scripts/evaluate_model.py`. Sections 5 and 6 are static text kept in that script, so re-running it keeps them.
 
@@ -12,7 +12,7 @@
 ## 1. Executive Summary
 
 The trained machine learning classifier was evaluated against an **untouched test split of 273 samples**.
-The model scored perfectly on this split, with zero false positives on its benign samples. **This split is drawn from the same hand-written templates as the training data, so the result is inflated and should not be read as real-world performance** (see sections 5 and 6).
+**This split is drawn from the same hand-written templates as the training data, so the result is inflated and should not be read as real-world performance** (see sections 5 and 6).
 
 - **Overall Accuracy:** 100.00%
 - **Macro F1 Score:** 1.0000
