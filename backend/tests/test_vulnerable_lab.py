@@ -53,3 +53,28 @@ def test_vulnerable_lab_sqli_error() -> None:
     injected_resp = client.get("/products?id=1'")
     assert injected_resp.status_code == 500
     assert "sqlite3.OperationalError" in injected_resp.text
+
+
+def test_lab_pages_are_marked_test_only() -> None:
+    from fastapi.testclient import TestClient
+    from labs.vulnerable_app import app
+
+    client = TestClient(app)
+    for path in ("/", "/vulnerable/search?q=x", "/safe/search?q=x", "/safe/products?id=1"):
+        response = client.get(path)
+        assert response.headers["x-threatsentry-lab"] == "TEST / BENCHMARK ONLY"
+        assert "TEST / BENCHMARK ONLY" in response.text
+
+
+def test_safe_endpoints_resist_payloads() -> None:
+    from fastapi.testclient import TestClient
+    from labs.vulnerable_app import app
+
+    client = TestClient(app)
+    xss = client.get("/safe/search", params={"q": "<script>alert(1)</script>"})
+    assert "<script>alert(1)</script>" not in xss.text
+    sqli = client.get("/safe/products", params={"id": "1' OR '1'='1"})
+    assert sqli.status_code == 404
+    assert "sqlite3" not in sqli.text
+    vulnerable = client.get("/vulnerable/search", params={"q": "<script>alert(1)</script>"})
+    assert "<script>alert(1)</script>" in vulnerable.text

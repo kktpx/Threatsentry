@@ -8,6 +8,12 @@ from fastapi.responses import HTMLResponse, PlainTextResponse
 
 app = FastAPI(title="ThreatSentry Controlled Vulnerable Lab", version="1.0.0")
 
+LAB_MARKER = "TEST / BENCHMARK ONLY"
+LAB_BANNER = (
+    '<div style="background:#b91c1c;color:#fff;font:700 13px monospace;padding:6px 12px;'
+    f'text-align:center;letter-spacing:.05em">{LAB_MARKER} &mdash; intentionally vulnerable, never expose publicly</div>'
+)
+
 # In-memory SQLite database for realistic SQL injection testing
 def get_db():
     conn = sqlite3.connect(":memory:", check_same_thread=False)
@@ -50,6 +56,18 @@ async def add_passive_vulnerabilities(request: Request, call_next):
     response.headers.append("Set-Cookie", "lab_session=guest_abc12345; Path=/")
 
     # Deliberately omits Content-Security-Policy, HSTS, X-Frame-Options, etc.
+
+    # 3. Every lab response is visibly marked as test-only
+    response.headers["X-ThreatSentry-Lab"] = LAB_MARKER
+    if response.headers.get("content-type", "").startswith("text/html"):
+        body = b"".join([chunk async for chunk in response.body_iterator])
+        text = body.decode("utf-8", errors="replace")
+        lowered = text.lower()
+        index = lowered.find("<body")
+        end = lowered.find(">", index) + 1 if index != -1 else -1
+        text = text[:end] + LAB_BANNER + text[end:] if end > 0 else LAB_BANNER + text
+        headers = {k: v for k, v in response.headers.items() if k.lower() != "content-length"}
+        return HTMLResponse(text, status_code=response.status_code, headers=headers)
     return response
 
 
@@ -174,6 +192,7 @@ def home():
 
 
 @app.get("/search", response_class=HTMLResponse)
+@app.get("/vulnerable/search", response_class=HTMLResponse)
 def search(q: str = "laptop"):
     """Vulnerable to Reflected XSS: Parameter 'q' is reflected unescaped."""
     return HTMLResponse(f"""
@@ -203,6 +222,7 @@ def search(q: str = "laptop"):
 
 
 @app.get("/products", response_class=HTMLResponse)
+@app.get("/vulnerable/products", response_class=HTMLResponse)
 def get_product(id: str = "1"):
     """Vulnerable to SQL Injection: Parameter 'id' is concatenated into query."""
     cursor = DB_CONN.cursor()
@@ -247,6 +267,43 @@ def get_product(id: str = "1"):
         </body>
         </html>
         """, status_code=500)
+
+
+@app.get("/safe/search", response_class=HTMLResponse)
+def safe_search(q: str = "laptop"):
+    """Safe counterpart of /vulnerable/search: the parameter is HTML-encoded before reflection."""
+    return HTMLResponse(f"""
+    <!DOCTYPE html>
+    <html>
+    <head><title>Search Results - ThreatSentry Lab (safe)</title></head>
+    <body>
+        <h1>Search Results</h1>
+        <p>You searched for: <strong>{html.escape(q)}</strong></p>
+        <p><a href="/">&larr; Back to Home</a></p>
+    </body>
+    </html>
+    """)
+
+
+@app.get("/safe/products", response_class=HTMLResponse)
+def safe_product(id: str = "1"):
+    """Safe counterpart of /vulnerable/products: parameterised query and no database error disclosure."""
+    row = DB_CONN.execute(
+        "SELECT id, name, price, description FROM products WHERE id = ?", (id,)
+    ).fetchone()
+    if not row:
+        return HTMLResponse("<!DOCTYPE html><html><body><h2>Product Not Found</h2></body></html>", status_code=404)
+    return HTMLResponse(f"""
+    <!DOCTYPE html>
+    <html>
+    <head><title>{html.escape(row['name'])} - ThreatSentry Lab (safe)</title></head>
+    <body>
+        <h1>{html.escape(row['name'])}</h1>
+        <p><strong>Price:</strong> ${row['price']:.2f}</p>
+        <p><strong>Description:</strong> {html.escape(row['description'])}</p>
+    </body>
+    </html>
+    """)
 
 
 @app.get("/about", response_class=HTMLResponse)
