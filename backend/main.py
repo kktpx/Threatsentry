@@ -1,7 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.core.config import Settings, get_settings
+from backend.core.rate_limit import SlidingWindowRateLimiter
 from backend.api.routers.websites import router as websites_router
 from backend.api.routers.scans import router as scans_router
 from backend.api.routers.findings import router as findings_router
@@ -23,6 +25,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["*"] if settings.app_env == "development" else ["Authorization", "Content-Type", "X-Request-Id"],
     )
+    ip_limiter = SlidingWindowRateLimiter(limit=settings.rate_limit_ip_per_minute, window_seconds=60)
+    app.state.scan_limiter = SlidingWindowRateLimiter(limit=settings.rate_limit_scans_per_hour, window_seconds=3600)
+
+    @app.middleware("http")
+    async def rate_limit_by_ip(request: Request, call_next):
+        # CORS preflights and health checks must never be throttled.
+        if request.url.path.startswith("/api/") and request.method != "OPTIONS":
+            client_ip = request.client.host if request.client else "unknown"
+            allowed, retry_after = ip_limiter.check(client_ip)
+            if not allowed:
+                return JSONResponse(
+                    status_code=429,
+                    content={"detail": "Too many requests. Please slow down."},
+                    headers={"Retry-After": str(retry_after)},
+                )
+        return await call_next(request)
+
     app.include_router(websites_router)
     app.include_router(scans_router)
     app.include_router(findings_router)
