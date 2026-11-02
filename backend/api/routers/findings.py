@@ -43,19 +43,31 @@ def list_scan_findings(
 @router.get("/api/websites/{website_id}/findings")
 def list_website_findings(
     website_id: str,
+    all_scans: bool = False,
     user_id: str = Depends(get_current_user_id),
     database: Client = Depends(get_database),
 ) -> list[dict[str, Any]]:
+    """Findings of the latest completed scan; pass all_scans=true for every scan's findings."""
     _owned_website(database, website_id, user_id)
-    response = (
+    query = (
         database.table("findings")
         .select("*")
         .eq("website_id", website_id)
         .eq("user_id", user_id)
-        .order("created_at", desc=True)
-        .execute()
     )
-    return response.data
+    if not all_scans:
+        latest = (
+            database.table("scan_jobs")
+            .select("id")
+            .eq("website_id", website_id)
+            .eq("user_id", user_id)
+            .eq("status", "COMPLETED")
+            .order("created_at", desc=True)
+            .execute()
+        )
+        if latest.data:
+            query = query.eq("scan_id", latest.data[0]["id"])
+    return query.order("created_at", desc=True).execute().data
 
 
 @router.get("/api/findings/{finding_id}")

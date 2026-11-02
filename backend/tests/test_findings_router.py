@@ -138,3 +138,20 @@ def test_get_finding_owned(client: TestClient) -> None:
 def test_get_finding_unowned_returns_404(client: TestClient) -> None:
     res = client.get("/api/findings/find-2")
     assert res.status_code == 404
+
+
+def test_website_findings_only_include_latest_completed_scan(mock_db: MockDatabase, client: TestClient) -> None:
+    mock_db.table("scan_jobs").rows.insert(0, {
+        "id": "scan-new", "user_id": "user-1", "website_id": "web-1", "scan_type": "DEEP_SCAN",
+        "status": "COMPLETED", "score": 90, "created_at": "2026-09-13T04:00:00+00:00",
+    })
+    mock_db.table("findings").rows.append({
+        "id": "find-3", "user_id": "user-1", "website_id": "web-1", "scan_id": "scan-new",
+        "title": "Reflected XSS", "severity": "HIGH", "status": "NEW", "created_at": "2026-09-13T04:05:00+00:00",
+    })
+
+    latest = client.get("/api/websites/web-1/findings").json()
+    assert [f["id"] for f in latest] == ["find-3"]
+
+    everything = client.get("/api/websites/web-1/findings", params={"all_scans": "true"}).json()
+    assert {f["id"] for f in everything} == {"find-1", "find-3"}
