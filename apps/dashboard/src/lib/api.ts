@@ -94,6 +94,10 @@ export function verifyWebsite(websiteId: string): Promise<Website> {
   return request<Website>(`/api/websites/${websiteId}/verify`, { method: 'POST' })
 }
 
+export function resetVerification(websiteId: string): Promise<Website> {
+  return request<Website>(`/api/websites/${websiteId}/verification/reset`, { method: 'POST' })
+}
+
 export function getWebsite(websiteId: string): Promise<Website> {
   return request<Website>(`/api/websites/${websiteId}`)
 }

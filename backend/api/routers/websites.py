@@ -11,6 +11,7 @@ from backend.api.website_verification import verification_update
 from backend.core.config import Settings, get_settings
 from backend.scanner.target_validation import TargetValidationError
 from backend.scanner.ssrf import BlockedTargetError
+from backend.scanner.verification import create_verification_token
 from backend.scanner.verification_fetch import verify_ownership_document
 
 router = APIRouter(prefix="/api/websites", tags=["websites"])
@@ -134,5 +135,34 @@ async def verify_website(
     except (BlockedTargetError, TargetValidationError, Exception):
         is_verified = False
     update = verification_update(is_verified, now=datetime.now(UTC))
+    response = database.table("websites").update(update).eq("id", website_id).eq("user_id", user_id).execute()
+    return response.data[0]
+
+
+@router.post("/{website_id}/verification/reset")
+def reset_verification(
+    website_id: str,
+    user_id: str = Depends(get_current_user_id),
+    database: Client = Depends(get_database),
+) -> dict[str, Any]:
+    """Issue a fresh ownership token and revoke any previous verification."""
+    _owned_website(database, website_id, user_id)
+    active = (
+        database.table("scan_jobs")
+        .select("id")
+        .eq("website_id", website_id)
+        .in_("status", ["PENDING", "RUNNING"])
+        .execute()
+    )
+    if active.data:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot reset verification while a scan is active.",
+        )
+    update = {
+        "verification_token": create_verification_token(),
+        "verification_status": "UNVERIFIED",
+        "verified_at": None,
+    }
     response = database.table("websites").update(update).eq("id", website_id).eq("user_id", user_id).execute()
     return response.data[0]

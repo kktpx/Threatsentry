@@ -2,7 +2,7 @@ import asyncio
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from supabase import Client
 
 from backend.api.deps.auth import get_current_user_id
@@ -20,11 +20,20 @@ router = APIRouter(tags=["scans"])
 @router.post("/api/websites/{website_id}/scans", status_code=status.HTTP_201_CREATED)
 async def create_scan(
     website_id: str,
+    request: Request,
     user_id: str = Depends(get_current_user_id),
     database: Client = Depends(get_database),
     settings: Settings = Depends(get_settings),
 ) -> dict[str, Any]:
     website = _owned_website(database, website_id, user_id)
+
+    allowed, retry_after = request.app.state.scan_limiter.check(user_id)
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="SCAN_LIMIT_EXCEEDED",
+            headers={"Retry-After": str(retry_after)},
+        )
 
     # 1. Require VERIFIED status
     try:

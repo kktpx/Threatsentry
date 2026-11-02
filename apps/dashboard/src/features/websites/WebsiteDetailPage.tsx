@@ -25,6 +25,7 @@ import {
   ScanJob,
   startScan,
   verifyWebsite,
+  resetVerification,
   Website,
 } from '../../lib/api'
 import { FindingDetailModal } from '../findings/FindingDetailModal'
@@ -51,6 +52,7 @@ export function WebsiteDetailPage() {
   const [verifying, setVerifying] = useState(false)
   const [verifyMessage, setVerifyMessage] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [resetting, setResetting] = useState(false)
 
   const pollingRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -71,6 +73,25 @@ export function WebsiteDetailPage() {
       setActionError(err instanceof Error ? err.message : 'Failed to verify website.')
     } finally {
       setVerifying(false)
+    }
+  }
+
+  async function handleResetVerification() {
+    if (!id) return
+    if (!window.confirm('Reset verification? You will need to publish the new token before you can scan again.')) {
+      return
+    }
+    setResetting(true)
+    setActionError(null)
+    setVerifyMessage(null)
+    try {
+      const updated = await resetVerification(id)
+      setWebsite((prev) => (prev ? { ...prev, ...updated } : updated))
+      setVerifyMessage('Verification reset. Publish the new token, then verify again.')
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to reset verification.')
+    } finally {
+      setResetting(false)
     }
   }
 
@@ -283,6 +304,17 @@ export function WebsiteDetailPage() {
                   icon={ShieldCheck}
                 >
                   {verifying ? 'Verifying...' : 'Verify Target'}
+                </Button>
+              )}
+              {isVerified && (
+                <Button
+                  onClick={() => void handleResetVerification()}
+                  disabled={resetting || !!activeScan}
+                  variant="secondary"
+                  icon={ShieldCheck}
+                  title="Issue a new ownership token and revoke verification"
+                >
+                  {resetting ? 'Resetting...' : 'Reset verification'}
                 </Button>
               )}
               <Button
@@ -535,12 +567,15 @@ export function WebsiteDetailPage() {
                     <th className="p-4 font-semibold">Stage</th>
                     <th className="p-4 font-semibold">Score</th>
                     <th className="p-4 font-semibold">Findings</th>
+                    <th className="p-4 font-semibold">New</th>
+                    <th className="p-4 font-semibold">Unchanged</th>
+                    <th className="p-4 font-semibold">Fixed</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)] text-[var(--text-secondary)]">
                   {scans.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="p-8 text-center text-[var(--text-muted)]">
+                      <td colSpan={8} className="p-8 text-center text-[var(--text-muted)]">
                         No scans recorded yet.
                       </td>
                     </tr>
@@ -564,6 +599,9 @@ export function WebsiteDetailPage() {
                             ? `${scan.summary.findings_count}`
                             : '—'}
                         </td>
+                        <td className="p-4 font-mono text-xs">{scan.summary?.new_findings_count ?? '—'}</td>
+                        <td className="p-4 font-mono text-xs">{scan.summary?.unchanged_findings_count ?? '—'}</td>
+                        <td className="p-4 font-mono text-xs text-[var(--success)]">{scan.summary?.fixed_findings_count ?? '—'}</td>
                       </tr>
                     ))
                   )}

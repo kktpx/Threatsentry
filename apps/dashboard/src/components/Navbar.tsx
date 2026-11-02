@@ -1,10 +1,8 @@
-import { Shield, Cpu, LogOut, Languages, Home } from 'lucide-react'
+import { Shield, Cpu, LogOut, Home } from 'lucide-react'
 import { useAuth } from '../features/auth/authState'
-import { useTranslation } from 'react-i18next'
 import { Link, useLocation } from 'react-router'
 
 export function Navbar() {
-  const { t, i18n } = useTranslation()
   const location = useLocation()
   const currentPath = location.pathname
 
@@ -19,11 +17,6 @@ export function Navbar() {
   }
 
   const isActive = (path: string) => currentPath === path
-
-  const toggleLanguage = () => {
-    const newLang = i18n.language === 'en' ? 'th' : 'en'
-    i18n.changeLanguage(newLang)
-  }
 
   return (
     <nav className="sticky top-0 z-50 flex items-center justify-between px-6 md:px-12 h-16 bg-[var(--bg)]/80 backdrop-blur-md border-b border-[var(--border)]">
@@ -53,7 +46,7 @@ export function Navbar() {
                 : 'text-[var(--text-secondary)] hover:text-[var(--text)]'
             }`}
           >
-            {t('navbar.dashboard')}
+            Dashboard
           </Link>
           <Link
             to="/websites/new"
@@ -74,21 +67,12 @@ export function Navbar() {
             }`}
           >
             <Cpu className="w-3.5 h-3.5" />
-            <span>{t('navbar.mlIntelligence')}</span>
+            <span>ML Intelligence</span>
           </Link>
         </div>
       </div>
 
       <div className="flex items-center gap-4">
-        <button
-          type="button"
-          onClick={toggleLanguage}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text)] border border-transparent transition-all cursor-pointer bg-transparent"
-          title="Toggle Language"
-        >
-          <Languages className="w-4 h-4" />
-          <span className="uppercase text-xs font-mono">{i18n.language === 'en' ? t('lang.th') : t('lang.en')}</span>
-        </button>
 
         {userEmail && (
           <span className="hidden lg:inline-block text-xs font-mono text-[var(--text-muted)] tracking-tight">
@@ -101,7 +85,7 @@ export function Navbar() {
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text)] border border-[var(--border)] hover:border-[var(--border-hover)] bg-[var(--surface)] transition-all cursor-pointer font-sans"
         >
           <LogOut className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline-block">{t('navbar.signOut')}</span>
+          <span className="hidden sm:inline-block">Sign out</span>
         </button>
       </div>
     </nav>

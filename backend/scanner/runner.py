@@ -12,7 +12,9 @@ from backend.scanner.analysis.hybrid import enrich_with_hybrid_analysis
 from backend.scanner.crawler import SafeCrawler
 from backend.scanner.findings import Finding, deduplicate_findings
 from backend.scanner.jobs import ScanJob, ScanJobTransitionError, ScanStatus
+from backend.scanner.passive.dns_checks import run_dns_checks
 from backend.scanner.passive.orchestrator import run_passive_checks_for_response
+from backend.scanner.passive.tls_checks import run_tls_checks
 from backend.scanner.scoring import FindingForScore, calculate_score
 from backend.scanner.ssrf import BlockedTargetError, Resolver, ensure_public_host, resolve_host
 from backend.scanner.target_validation import TargetValidationError, normalize_target
@@ -93,7 +95,7 @@ async def run_scan_job(
 
     try:
         target = normalize_target(target_url, allow_local=effective_allow_local)
-        await ensure_public_host(target.host, resolver=effective_resolver, allow_local=effective_allow_local)
+        validated_ips = await ensure_public_host(target.host, resolver=effective_resolver, allow_local=effective_allow_local)
     except (TargetValidationError, BlockedTargetError) as exc:
         job.fail()
         database.table("scan_jobs").update({
@@ -162,6 +164,46 @@ async def run_scan_job(
     }).eq("id", scan_id).execute()
 
     pages_to_check = attack_surface.pages_crawled if attack_surface and attack_surface.pages_crawled else [target.url]
+
+    if target.url.startswith("https://") and validated_ips and client is None:
+        try:
+            for tls in await run_tls_checks(target.host, validated_ips[0], target.port or 443):
+                all_findings.append(
+                    Finding(
+                        title=f"TLS Configuration Issue: {tls.category}",
+                        category=tls.category,
+                        severity=tls.severity,
+                        endpoint=target.origin,
+                        description="The TLS handshake revealed a certificate or protocol weakness.",
+                        recommendation=tls.recommendation,
+                        detection_method="PASSIVE",
+                        confidence="CONFIRMED",
+                        evidence=tls.evidence,
+                        subtype=tls.category,
+                    )
+                )
+        except Exception as exc:
+            logger.debug("TLS check skipped for %s: %s", target.host, exc)
+
+    if client is None:
+        try:
+            for dns_finding in await run_dns_checks(target.host):
+                all_findings.append(
+                    Finding(
+                        title=f"DNS Configuration Note: {dns_finding.category}",
+                        category=dns_finding.category,
+                        severity=dns_finding.severity,
+                        endpoint=target.origin,
+                        description="DNS records for this host suggest a missing or weak email/certificate policy.",
+                        recommendation=dns_finding.recommendation,
+                        detection_method="PASSIVE",
+                        confidence="LIKELY",
+                        evidence=dns_finding.evidence,
+                        subtype=dns_finding.category,
+                    )
+                )
+        except Exception as exc:
+            logger.debug("DNS check skipped for %s: %s", target.host, exc)
 
     for page_url in pages_to_check:
         if is_job_cancelled(scan_id, database):

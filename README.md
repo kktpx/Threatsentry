@@ -27,7 +27,7 @@ ThreatSentry is a **scanner**, not a Web Application Firewall (WAF), and does no
 - **Risk presentation** with severity and security scoring in the dashboard.
 - **ML-assisted payload classification** into `NORMAL`, `SQLI`, and `XSS`.
 - **Supabase authentication and storage** for website, scan, and finding records.
-- **English/Thai interface**, plus a local deliberately vulnerable test application.
+- A local deliberately vulnerable test application.
 
 ## Technology
 
