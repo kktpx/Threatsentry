@@ -2,14 +2,12 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { Plus, Globe, Activity, Cpu, ArrowRight } from 'lucide-react'
 import { listWebsites, Website } from '../../lib/api'
-import { useTranslation } from 'react-i18next'
 import { Button } from '../../components/ui/Button'
 import { StatCard } from '../../components/ui/StatCard'
 import { SecurityScore } from '../../components/ui/SecurityScore'
 import { Navbar } from '../../components/Navbar'
 
 export function DashboardPage() {
-  const { t } = useTranslation()
   const [websites, setWebsites] = useState<Website[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -45,7 +43,7 @@ export function DashboardPage() {
       <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
         <Navbar />
         <main className="app-container flex items-center justify-center min-h-[calc(100vh-64px)]">
-          <p role="status" className="text-[var(--text-muted)] py-12 text-center text-sm font-mono">{t('common.loading')}</p>
+          <p role="status" className="text-[var(--text-muted)] py-12 text-center text-sm font-mono">Loading...</p>
         </main>
       </div>
     )
@@ -95,7 +93,7 @@ export function DashboardPage() {
           </div>
           <Button asChild to="/websites/new" variant="primary">
             <Plus className="w-4 h-4" />
-            <span>{t('dashboard.addNewTarget')}</span>
+            <span>Add New Target</span>
           </Button>
         </div>
 
@@ -110,13 +108,13 @@ export function DashboardPage() {
             <div className="w-16 h-16 rounded-full bg-[var(--surface-2)] flex items-center justify-center mb-4">
               <Globe className="w-8 h-8 text-[var(--text-muted)]" />
             </div>
-            <h2 className="text-xl font-bold text-[var(--text)] mb-2">{t('dashboard.noWebsitesTitle')}</h2>
+            <h2 className="text-xl font-bold text-[var(--text)] mb-2">No websites monitored</h2>
             <p className="text-[var(--text-secondary)] text-sm max-w-sm mb-6">
-              {t('dashboard.noWebsitesDesc')}
+              Add your first website to start deep security scanning.
             </p>
             <Button asChild to="/websites/new" variant="secondary">
               <Plus className="w-4 h-4" />
-              <span>{t('dashboard.addFirstWebsite')}</span>
+              <span>Add First Website</span>
             </Button>
           </div>
         ) : (

@@ -5,12 +5,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { WebsiteDetailPage } from './WebsiteDetailPage'
 
-const { getWebsite, listScansForWebsite, startScan, cancelScan, listFindingsForWebsite } = vi.hoisted(() => ({
+const { getWebsite, listScansForWebsite, startScan, cancelScan, listFindingsForWebsite, resetVerification } = vi.hoisted(() => ({
   getWebsite: vi.fn(),
   listScansForWebsite: vi.fn(),
   startScan: vi.fn(),
   cancelScan: vi.fn(),
   listFindingsForWebsite: vi.fn().mockResolvedValue([]),
+  resetVerification: vi.fn(),
 }))
 
 vi.mock('../../lib/api', () => ({
@@ -19,6 +20,7 @@ vi.mock('../../lib/api', () => ({
   startScan,
   cancelScan,
   listFindingsForWebsite,
+  resetVerification,
 }))
 
 describe('WebsiteDetailPage', () => {
@@ -146,5 +148,42 @@ describe('WebsiteDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByText('CANCELLED')).toBeInTheDocument()
     })
+  })
+  it('resets verification and shows the verify action again, and lists rescan comparison counts', async () => {
+    const site = {
+      id: 'site-1',
+      name: 'Secure Portal',
+      normalized_origin: 'https://secure.example.com',
+      verification_status: 'VERIFIED',
+      last_score: 90,
+    }
+    getWebsite.mockResolvedValue(site)
+    listScansForWebsite.mockResolvedValue([
+      {
+        id: 'scan-1', website_id: 'site-1', user_id: 'user-1', scan_type: 'DEEP_SCAN', status: 'COMPLETED',
+        current_stage: 'COMPLETE', progress: 100, score: 90, created_at: '2026-09-12T04:00:00Z',
+        summary: { findings_count: 3, new_findings_count: 1, unchanged_findings_count: 2, fixed_findings_count: 4 },
+      },
+    ])
+    resetVerification.mockResolvedValue({ ...site, verification_status: 'UNVERIFIED', verification_token: 'new-token' })
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const user = userEvent.setup()
+
+    render(
+      <MemoryRouter initialEntries={['/websites/site-1']}>
+        <Routes>
+          <Route path="/websites/:id" element={<WebsiteDetailPage />} />
+        </Routes>
+      </MemoryRouter>
+    )
+
+    await user.click(await screen.findByRole('button', { name: /Scan History|History/i }))
+    expect(await screen.findByText('Fixed')).toBeInTheDocument()
+    expect(screen.getByText('4')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /Reset verification/i }))
+
+    await waitFor(() => expect(resetVerification).toHaveBeenCalledWith('site-1'))
+    expect(await screen.findByRole('button', { name: /Verify Target/i })).toBeInTheDocument()
   })
 })

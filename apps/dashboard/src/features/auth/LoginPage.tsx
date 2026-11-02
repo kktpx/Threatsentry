@@ -94,6 +94,11 @@ export function LoginPage() {
                 placeholder="••••••••"
                 className="w-full bg-[var(--surface-2)] border border-[var(--border)] focus:border-[var(--accent)] rounded-lg p-3 text-sm text-[var(--text)] outline-none transition-colors"
               />
+              <div className="mt-2 text-right">
+                <Link to="/forgot-password" className="text-xs text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors no-underline">
+                  Forgot password?
+                </Link>
+              </div>
             </div>
             
             {error && (
