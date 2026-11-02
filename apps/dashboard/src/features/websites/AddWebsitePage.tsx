@@ -30,7 +30,7 @@ export function AddWebsitePage() {
       setUrl(urlParam)
       try {
         const urlObj = new URL(urlParam)
-        setName(urlObj.hostname)
+        setName(urlObj.host)
       } catch {
         // Ignore invalid URL parsing for name guess
       }
@@ -41,7 +41,7 @@ export function AddWebsitePage() {
         setUrl(pendingUrl)
         try {
           const urlObj = new URL(pendingUrl)
-          setName(urlObj.hostname)
+          setName(urlObj.host)
         } catch {
           // Ignore
         }
@@ -151,6 +151,14 @@ export function AddWebsitePage() {
                   type="url"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
+                  onBlur={(e) => {
+                    if (name) return
+                    try {
+                      setName(new URL(e.target.value).host)
+                    } catch {
+                      // Not a full URL
+                    }
+                  }}
                   placeholder="https://example.com"
                   required
                   className="w-full bg-[var(--surface-2)] border border-[var(--border)] focus:border-[var(--accent)] rounded-lg p-3 text-sm text-[var(--text)] font-mono outline-none transition-colors"

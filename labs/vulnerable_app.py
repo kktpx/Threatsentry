@@ -14,6 +14,20 @@ LAB_BANNER = (
     f'text-align:center;letter-spacing:.05em">{LAB_MARKER} &mdash; intentionally vulnerable, never expose publicly</div>'
 )
 
+# LAB_MODE limits which vulnerable feature is reachable: "xss", "sqli" or "all" (default).
+XSS_PREFIXES = ("/search", "/vulnerable/search", "/safe/search")
+SQLI_PREFIXES = ("/products", "/vulnerable/products", "/safe/products")
+
+
+def lab_mode() -> str:
+    mode = os.environ.get("LAB_MODE", "all").lower()
+    return mode if mode in {"xss", "sqli"} else "all"
+
+
+def _disabled_prefixes() -> tuple[str, ...]:
+    return {"xss": SQLI_PREFIXES, "sqli": XSS_PREFIXES}.get(lab_mode(), ())
+
+
 # In-memory SQLite database for realistic SQL injection testing
 def get_db():
     conn = sqlite3.connect(":memory:", check_same_thread=False)
@@ -42,6 +56,13 @@ if TOKEN_FILE.exists():
         _in_memory_token = TOKEN_FILE.read_text("utf-8").strip().replace("threatsentry-verification=", "")
     except Exception:
         pass
+
+
+@app.middleware("http")
+async def restrict_to_lab_mode(request: Request, call_next):
+    if request.url.path.rstrip("/") in _disabled_prefixes():
+        return PlainTextResponse(f"Not available: this lab instance runs in '{lab_mode()}' mode.", status_code=404)
+    return await call_next(request)
 
 
 @app.middleware("http")
@@ -118,8 +139,38 @@ def set_verification_token(token: str = Query(default="", alias="token")):
     """)
 
 
+XSS_CARD = """
+            <!-- Vulnerable Reflected XSS -->
+            <div class="card">
+                <h2>2. Search Service <span class="badge vuln">Vulnerable: Reflected XSS</span></h2>
+                <p>Input in parameter <code>q</code> is rendered directly into HTML without context-aware entity encoding.</p>
+                <form action="/search" method="GET" style="display: flex; gap: 0.5rem;">
+                    <input type="text" name="q" value="laptop stand" />
+                    <button type="submit">Search Products</button>
+                </form>
+            </div>
+"""
+
+SQLI_CARD = """
+            <!-- Vulnerable SQL Injection -->
+            <div class="card">
+                <h2>3. Product Catalog <span class="badge vuln">Vulnerable: SQL Injection</span></h2>
+                <p>Parameter <code>id</code> is interpolated directly into an in-memory SQLite query.</p>
+                <ul>
+                    <li><a href="/products?id=1">Product 1 (Secure Laptop Stand)</a></li>
+                    <li><a href="/products?id=2">Product 2 (Mechanical Keyboard)</a></li>
+                    <li><a href="/products?id=3">Product 3 (Privacy Screen Protector)</a></li>
+                    <li><a href="/products?id=1%27">Trigger Error: Product ID <code>1'</code></a></li>
+                </ul>
+            </div>
+"""
+
+
 @app.get("/", response_class=HTMLResponse)
 def home():
+    mode = lab_mode()
+    xss_card = XSS_CARD if mode in {"all", "xss"} else ""
+    sqli_card = SQLI_CARD if mode in {"all", "sqli"} else ""
     return HTMLResponse(f"""
     <!DOCTYPE html>
     <html lang="en">
@@ -157,27 +208,9 @@ def home():
                 </form>
             </div>
 
-            <!-- Vulnerable Reflected XSS -->
-            <div class="card">
-                <h2>2. Search Service <span class="badge vuln">Vulnerable: Reflected XSS</span></h2>
-                <p>Input in parameter <code>q</code> is rendered directly into HTML without context-aware entity encoding.</p>
-                <form action="/search" method="GET" style="display: flex; gap: 0.5rem;">
-                    <input type="text" name="q" value="laptop stand" />
-                    <button type="submit">Search Products</button>
-                </form>
-            </div>
+            {xss_card}
 
-            <!-- Vulnerable SQL Injection -->
-            <div class="card">
-                <h2>3. Product Catalog <span class="badge vuln">Vulnerable: SQL Injection</span></h2>
-                <p>Parameter <code>id</code> is interpolated directly into an in-memory SQLite query.</p>
-                <ul>
-                    <li><a href="/products?id=1">Product 1 (Secure Laptop Stand)</a></li>
-                    <li><a href="/products?id=2">Product 2 (Mechanical Keyboard)</a></li>
-                    <li><a href="/products?id=3">Product 3 (Privacy Screen Protector)</a></li>
-                    <li><a href="/products?id=1%27">Trigger Error: Product ID <code>1'</code></a></li>
-                </ul>
-            </div>
+            {sqli_card}
 
             <!-- Benign Navigation Links -->
             <div class="card">
@@ -331,5 +364,16 @@ def contact():
 
 
 if __name__ == "__main__":
+    import argparse
+
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8080)
+
+    parser = argparse.ArgumentParser(description="ThreatSentry controlled vulnerable lab")
+    parser.add_argument("--mode", choices=["all", "xss", "sqli"], default="all")
+    parser.add_argument("--port", type=int, default=8080)
+    parser.add_argument("--host", default="127.0.0.1", help="Use 0.0.0.0 only on a trusted, isolated network.")
+    args = parser.parse_args()
+    os.environ["LAB_MODE"] = args.mode
+    if args.host not in {"127.0.0.1", "localhost"}:
+        print(f"WARNING: lab is intentionally vulnerable and is now reachable from the network via {args.host}:{args.port}")
+    uvicorn.run(app, host=args.host, port=args.port)
