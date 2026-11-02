@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     )
     model_path: str | None = Field(default=None, validation_alias="MODEL_PATH")
     scan_allow_local: bool = Field(default=False, validation_alias="SCAN_ALLOW_LOCAL")
+    scan_max_duration_seconds: int = Field(default=600, ge=1, validation_alias="SCAN_MAX_DURATION_SECONDS")
     rate_limit_ip_per_minute: int = Field(default=120, ge=1, validation_alias="RATE_LIMIT_IP_PER_MINUTE")
     rate_limit_scans_per_hour: int = Field(default=10, ge=1, validation_alias="RATE_LIMIT_SCANS_PER_HOUR")
 

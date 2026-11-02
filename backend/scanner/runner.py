@@ -10,6 +10,7 @@ from backend.scanner.active.reflected_xss import scan_reflected_xss_for_paramete
 from backend.scanner.active.sqli import scan_sqli_for_parameter
 from backend.scanner.analysis.hybrid import enrich_with_hybrid_analysis
 from backend.scanner.crawler import SafeCrawler
+from backend.scanner.discovery import discover_seed_urls
 from backend.scanner.findings import Finding, deduplicate_findings
 from backend.scanner.jobs import ScanJob, ScanJobTransitionError, ScanStatus
 from backend.scanner.passive.dns_checks import run_dns_checks
@@ -45,6 +46,36 @@ def is_job_cancelled(scan_id: str, database: Any) -> bool:
 
 
 async def run_scan_job(
+    scan_id: str,
+    target_url: str,
+    website_id: str,
+    database: Any,
+    *,
+    max_duration_seconds: float | None = None,
+    **kwargs: Any,
+) -> None:
+    """Runs a scan under a hard time limit; a scan that exceeds it is failed with SCAN_TIMEOUT."""
+    limit = max_duration_seconds if max_duration_seconds is not None else get_settings().scan_max_duration_seconds
+    try:
+        await asyncio.wait_for(
+            _run_scan_job(scan_id, target_url, website_id, database, **kwargs),
+            timeout=limit,
+        )
+    except asyncio.TimeoutError:
+        logger.warning("Scan %s exceeded the %ss time limit", scan_id, limit)
+        _active_cancellations.discard(scan_id)
+        try:
+            database.table("scan_jobs").update({
+                "status": ScanStatus.FAILED.value,
+                "finished_at": datetime.now(UTC).isoformat(),
+                "error_code": "SCAN_TIMEOUT",
+                "error_message_safe": "The scan exceeded the maximum allowed duration.",
+            }).eq("id", scan_id).execute()
+        except Exception as exc:
+            logger.warning("Failed to record timeout for scan %s: %s", scan_id, exc)
+
+
+async def _run_scan_job(
     scan_id: str,
     target_url: str,
     website_id: str,
@@ -135,9 +166,16 @@ async def run_scan_job(
 
     all_findings: list[Finding] = []
 
+    seed_urls: list[str] = []
+    try:
+        seed_urls = await discover_seed_urls(http_client, target.origin)
+    except Exception as exc:
+        logger.debug("Discovery skipped for %s: %s", target.origin, exc)
+
     try:
         crawler = SafeCrawler(
             target_url,
+            seed_urls=seed_urls,
             max_pages=20,
             max_depth=2,
             concurrency=3,
@@ -221,6 +259,7 @@ async def run_scan_job(
                 body=resp.text[:65536],
                 status_code=resp.status_code,
                 raw_cookies=cookie_headers,
+                location=resp.headers.get("location"),
             )
             all_findings.extend(passive_res)
         except Exception as exc:

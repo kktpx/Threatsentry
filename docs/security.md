@@ -24,8 +24,8 @@ Supabase Auth issues tokens; the API validates them and derives the user id. Own
 ## Abuse limits
 
 - Per-IP limit on `/api/*` (default 120/min) and per-user limit on scan creation (default 10/hour). Env: `RATE_LIMIT_IP_PER_MINUTE`, `RATE_LIMIT_SCANS_PER_HOUR`. Limits are in-memory and per instance.
-- Behind a reverse proxy, run uvicorn with `--proxy-headers` and a correct `FORWARDED_ALLOW_IPS`, otherwise every client appears to share the proxy's IP.
-- One active scan per website.
+- Behind a reverse proxy, run uvicorn with `--proxy-headers` and a correct `--forwarded-allow-ips`, otherwise every client appears to share the proxy's IP. `render.yaml` sets this for Render; if the API is ever directly reachable, a client could spoof `X-Forwarded-For` and evade the per-IP limit.
+- One active scan per website, and a maximum scan duration (`SCAN_MAX_DURATION_SECONDS`, default 600).
 - Production refuses wildcard/localhost CORS origins and `SCAN_ALLOW_LOCAL`.
 
 ## Logging
@@ -38,4 +38,4 @@ Do not log passwords, tokens, API keys, the service-role key, sensitive form val
 
 ## Known gaps
 
-No maximum scan duration; no persistent or distributed rate limiting; evidence is rendered by the dashboard as text, not trusted HTML.
+No persistent or distributed rate limiting; evidence is rendered by the dashboard as text, not trusted HTML.

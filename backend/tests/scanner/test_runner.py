@@ -235,3 +235,29 @@ async def test_run_scan_job_fails_on_ssrf_resolution() -> None:
     assert scans[0]["error_code"] == "SSRF_VALIDATION_FAILED"
     assert "public network validation" in scans[0]["error_message_safe"]
     assert scans[0]["finished_at"] is not None
+
+
+@pytest.mark.asyncio
+async def test_scan_exceeding_time_limit_fails_with_scan_timeout() -> None:
+    db = MockDatabase({
+        "scan_jobs": [{"id": "scan-slow", "website_id": "web-1", "user_id": "user-1", "status": "PENDING", "finished_at": None}],
+        "websites": [{"id": "web-1", "user_id": "user-1", "url": "https://example.com", "verification_status": "VERIFIED"}],
+    })
+
+    async def slow_resolver(host: str) -> list[str]:
+        await asyncio.sleep(5)
+        return ["93.184.216.34"]
+
+    await run_scan_job(
+        scan_id="scan-slow",
+        target_url="https://example.com",
+        website_id="web-1",
+        database=db,
+        resolver=slow_resolver,
+        max_duration_seconds=0.2,
+    )
+
+    scan = db.table("scan_jobs").rows[0]
+    assert scan["status"] == "FAILED"
+    assert scan["error_code"] == "SCAN_TIMEOUT"
+    assert scan["finished_at"] is not None

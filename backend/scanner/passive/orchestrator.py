@@ -1,12 +1,14 @@
 from typing import Any, Mapping
+from urllib.parse import urlsplit
 
 import httpx
 
 from backend.scanner.findings import Finding
 from backend.scanner.passive.cookie_checks import evaluate_cookies
-from backend.scanner.passive.exposure import evaluate_content_exposure
+from backend.scanner.passive.exposure import evaluate_content_exposure, evaluate_redirect_downgrade
 from backend.scanner.passive.header_checks import evaluate_security_headers
 from backend.scanner.passive.http_checks import evaluate_http_protocol, evaluate_server_banners
+from backend.scanner.passive.technology import detect_technologies
 
 
 def run_passive_checks_for_response(
@@ -15,6 +17,7 @@ def run_passive_checks_for_response(
     body: str,
     status_code: int,
     raw_cookies: list[str],
+    location: str | None = None,
 ) -> list[Finding]:
     findings: list[Finding] = []
     is_https = url.startswith("https://")
@@ -89,19 +92,41 @@ def run_passive_checks_for_response(
         )
 
     # 5. Content exposure
-    for exposure in evaluate_content_exposure(body, status_code):
+    for exposure in [*evaluate_content_exposure(body, status_code, is_https=is_https), *evaluate_redirect_downgrade(url, status_code, location)]:
         findings.append(
             Finding(
                 title=f"Sensitive Exposure: {exposure.category}",
                 category=exposure.category,
                 severity=exposure.severity,
                 endpoint=url,
-                description="The response content contains sensitive error or directory listing indicators.",
+                description="The response shows signs of accidental exposure (error output, directory listing, source map, mixed content or an HTTPS downgrade).",
                 recommendation=exposure.recommendation,
                 detection_method="PASSIVE",
                 confidence="CONFIRMED",
                 evidence=exposure.evidence,
                 subtype=exposure.category,
+            )
+        )
+
+    # 6. Technology detection (informational; reported once per origin so it is not repeated for every page)
+    parts = urlsplit(url)
+    origin = f"{parts.scheme}://{parts.netloc}"
+    for tech in detect_technologies(headers, body, raw_cookies):
+        findings.append(
+            Finding(
+                title=f"Technology Detected: {tech.name}",
+                category="TECHNOLOGY_DETECTED",
+                severity="INFO",
+                endpoint=origin,
+                description=(
+                    f"Indicators suggest the site uses {tech.name} (inferred from {tech.source}). "
+                    "This is an inference and may be inaccurate."
+                ),
+                recommendation="Informational only. Avoid advertising exact technologies and versions, and keep components patched.",
+                detection_method="PASSIVE",
+                confidence=tech.confidence,
+                evidence=tech.evidence,
+                subtype=tech.name,
             )
         )
 

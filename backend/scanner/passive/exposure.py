@@ -1,6 +1,8 @@
 import re
 from typing import Literal
 
+from bs4 import BeautifulSoup
+
 Severity = Literal["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]
 
 
@@ -29,7 +31,43 @@ DIRECTORY_LISTING_PATTERNS = (
 )
 
 
-def evaluate_content_exposure(body: str, status_code: int) -> list[ExposureFinding]:
+SOURCE_MAP_PATTERN = re.compile(r"[#@]\s*sourceMappingURL=(\S+)", re.IGNORECASE)
+
+# Active mixed content can be modified by a network attacker and runs with the page's privileges.
+ACTIVE_MIXED_TAGS = {"script": "src", "iframe": "src", "link": "href", "form": "action"}
+PASSIVE_MIXED_TAGS = {"img": "src", "audio": "src", "video": "src"}
+
+
+def _insecure_references(body: str) -> tuple[list[str], list[str]]:
+    soup = BeautifulSoup(body, "html.parser")
+    active: list[str] = []
+    passive: list[str] = []
+    for tag in soup.find_all(list({**ACTIVE_MIXED_TAGS, **PASSIVE_MIXED_TAGS})):
+        attr = ACTIVE_MIXED_TAGS.get(tag.name) or PASSIVE_MIXED_TAGS[tag.name]
+        value = str(tag.get(attr) or "").strip()
+        if not value.lower().startswith("http://"):
+            continue
+        if tag.name == "link" and "stylesheet" not in [r.lower() for r in tag.get("rel", [])]:
+            continue
+        (active if tag.name in ACTIVE_MIXED_TAGS else passive).append(value[:150])
+    return active, passive
+
+
+def evaluate_redirect_downgrade(url: str, status_code: int, location: str | None) -> list[ExposureFinding]:
+    """Flags an HTTPS page that redirects to plain HTTP."""
+    if url.startswith("https://") and 300 <= status_code < 400 and (location or "").lower().startswith("http://"):
+        return [
+            ExposureFinding(
+                category="HTTPS_DOWNGRADE_REDIRECT",
+                severity="MEDIUM",
+                recommendation="Redirect to HTTPS URLs only, and enable HSTS so browsers never fall back to HTTP.",
+                evidence={"status_code": str(status_code), "location": (location or "")[:150]},
+            )
+        ]
+    return []
+
+
+def evaluate_content_exposure(body: str, status_code: int, *, is_https: bool = False) -> list[ExposureFinding]:
     findings: list[ExposureFinding] = []
 
     # 1. Stack trace detection
@@ -58,5 +96,39 @@ def evaluate_content_exposure(body: str, status_code: int) -> list[ExposureFindi
                 )
             )
             break
+
+    # 3. Source map reference
+    source_map = SOURCE_MAP_PATTERN.search(body)
+    if source_map:
+        findings.append(
+            ExposureFinding(
+                category="SOURCE_MAP_EXPOSURE",
+                severity="LOW",
+                recommendation="Do not publish source maps to production, or restrict them to authenticated developers.",
+                evidence={"reference": source_map.group(1)[:150]},
+            )
+        )
+
+    # 4. Mixed content on HTTPS pages
+    if is_https and "http://" in body.lower():
+        active, passive = _insecure_references(body)
+        if active:
+            findings.append(
+                ExposureFinding(
+                    category="MIXED_CONTENT_ACTIVE",
+                    severity="MEDIUM",
+                    recommendation="Load scripts, frames, stylesheets and form targets over HTTPS only.",
+                    evidence={"count": str(len(active)), "example": active[0]},
+                )
+            )
+        if passive:
+            findings.append(
+                ExposureFinding(
+                    category="MIXED_CONTENT_PASSIVE",
+                    severity="LOW",
+                    recommendation="Load images and media over HTTPS only.",
+                    evidence={"count": str(len(passive)), "example": passive[0]},
+                )
+            )
 
     return findings

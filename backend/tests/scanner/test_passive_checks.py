@@ -52,3 +52,21 @@ def test_run_passive_checks_for_response() -> None:
     assert "SERVER_BANNER_LEAKAGE" in categories
     assert "MISSING_CSP" in categories
     assert "COOKIE_MISSING_HTTPONLY" in categories
+
+
+def test_mixed_content_distinguishes_active_from_passive_and_requires_https() -> None:
+    body = '<script src="http://cdn.example.com/a.js"></script><img src="http://cdn.example.com/a.png"><a href="http://x.test">link</a>'
+    https_cats = {f.category for f in evaluate_content_exposure(body, 200, is_https=True)}
+    assert https_cats == {"MIXED_CONTENT_ACTIVE", "MIXED_CONTENT_PASSIVE"}
+    assert evaluate_content_exposure(body, 200, is_https=False) == []
+
+
+def test_source_map_reference_and_downgrade_redirect() -> None:
+    from backend.scanner.passive.exposure import evaluate_redirect_downgrade
+
+    found = evaluate_content_exposure("console.log(1)\n//# sourceMappingURL=app.js.map", 200)
+    assert [f.category for f in found] == ["SOURCE_MAP_EXPOSURE"]
+
+    assert evaluate_redirect_downgrade("https://a.test/", 301, "http://a.test/")[0].category == "HTTPS_DOWNGRADE_REDIRECT"
+    assert evaluate_redirect_downgrade("https://a.test/", 301, "https://a.test/x") == []
+    assert evaluate_redirect_downgrade("http://a.test/", 301, "http://a.test/x") == []
