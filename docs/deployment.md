@@ -21,6 +21,10 @@ Frontend on Vercel, API on Render (`render.yaml`), database and auth on Supabase
 
 Root directory `apps/dashboard`. `vercel.json` provides SPA routing. Set `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` and `VITE_API_URL` (the deployed API URL).
 
+## Automated smoke test
+
+`python scripts/smoke_test.py https://<api-host> https://<dashboard-origin>` runs read-only checks (health, model loaded, auth required, CORS, SPA routing). It does not replace the manual checklist below: login, verification and scanning need a real account and target.
+
 ## Verification checklist
 
 - [ ] `/health` returns `status: ok`.
