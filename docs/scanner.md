@@ -9,12 +9,13 @@ The user serves `https://<origin>/.well-known/threatsentry.txt` containing `thre
 ## Pipeline
 
 1. **Target validation / SSRF** (`target_validation.py`, `ssrf.py`): normalises the URL and rejects non-public addresses. Resolution is checked again when the scan starts.
-2. **Crawler** (`crawler.py`): same-origin only, bounded pages, depth, concurrency and response size. The runner uses 20 pages, depth 2 and concurrency 3. Routes with destructive keywords (logout, delete, checkout, …) are skipped.
-3. **Passive checks** (`scanner/passive/`): see below. No exploitation.
-4. **Active checks** (`scanner/active/`): SQL injection and reflected XSS against discovered parameters, only after steps 1–3 and only on verified targets.
-5. **Analysis** (`analysis/hybrid.py`): attaches ML evidence to findings.
-6. **Findings** (`findings.py`, `fingerprints.py`): fingerprints are SHA-256 over origin, category, method, path, parameter and subtype, so a re-scan matches the same issue. Duplicates are dropped before scoring.
-7. **Scoring** (`scoring.py`): `100 − Σ deductions` over unique findings, floored at 0. Deductions: CRITICAL 20, HIGH 10, MEDIUM 5, LOW 2, INFO 0.
+2. **Discovery** (`discovery.py`): reads `robots.txt` (literal `Allow`/`Disallow` paths and `Sitemap:` entries) and `sitemap.xml` (nested sitemap indexes ignored, at most 40 URLs, 256 KiB per file) on the same origin and passes them to the crawler as seed URLs. Seeds are hints only: each one still goes through the crawler's SSRF, same-origin and destructive-path checks. Disallowed paths are fetched with GET only, since the user owns the verified target.
+3. **Crawler** (`crawler.py`): same-origin only, bounded pages, depth, concurrency and response size. The runner uses 20 pages, depth 2 and concurrency 3. Routes with destructive keywords (logout, delete, checkout, …) are skipped.
+4. **Passive checks** (`scanner/passive/`): see below. No exploitation.
+5. **Active checks** (`scanner/active/`): SQL injection and reflected XSS against discovered parameters, only after steps 1–3 and only on verified targets.
+6. **Analysis** (`analysis/hybrid.py`): attaches ML evidence to findings.
+7. **Findings** (`findings.py`, `fingerprints.py`): fingerprints are SHA-256 over origin, category, method, path, parameter and subtype, so a re-scan matches the same issue. Duplicates are dropped before scoring.
+8. **Scoring** (`scoring.py`): `100 − Σ deductions` over unique findings, floored at 0. Deductions: CRITICAL 20, HIGH 10, MEDIUM 5, LOW 2, INFO 0.
 
 ## Passive checks
 
@@ -39,4 +40,4 @@ Every scan runs under a hard time limit (`SCAN_MAX_DURATION_SECONDS`, default 60
 
 ## Not implemented
 
-A dedicated discovery module (robots.txt, sitemap, common paths) is not implemented; discovery is done by the crawler only.
+Probing common paths (for example `/admin`, `/.git`) is not implemented; discovery covers `robots.txt`, `sitemap.xml` and links found by the crawler.

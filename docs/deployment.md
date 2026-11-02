@@ -13,7 +13,7 @@ Frontend on Vercel, API on Render (`render.yaml`), database and auth on Supabase
 `render.yaml` builds with `pip install -r requirements.txt` and starts `uvicorn backend.main:app`. Set the secrets marked `sync: false`: `ALLOWED_ORIGINS`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
 
 - `APP_ENV=production` forbids wildcard/localhost origins and `SCAN_ALLOW_LOCAL`.
-- Add `--proxy-headers` to the start command (and set `FORWARDED_ALLOW_IPS`) so rate limiting sees real client IPs.
+- `render.yaml` starts uvicorn with `--proxy-headers --forwarded-allow-ips='*'` so rate limiting sees real client IPs. This trusts `X-Forwarded-For` from any peer, which is only safe because Render's load balancer is the sole way to reach the service; do not copy it to a setup where the API is directly exposed.
 - The model `ml/models/web_ids_model_v1.0.0.joblib` is committed and loaded from `MODEL_PATH`.
 - Check `GET /health` after deploy; it reports model readiness.
 

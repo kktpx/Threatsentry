@@ -10,6 +10,7 @@ from backend.scanner.active.reflected_xss import scan_reflected_xss_for_paramete
 from backend.scanner.active.sqli import scan_sqli_for_parameter
 from backend.scanner.analysis.hybrid import enrich_with_hybrid_analysis
 from backend.scanner.crawler import SafeCrawler
+from backend.scanner.discovery import discover_seed_urls
 from backend.scanner.findings import Finding, deduplicate_findings
 from backend.scanner.jobs import ScanJob, ScanJobTransitionError, ScanStatus
 from backend.scanner.passive.dns_checks import run_dns_checks
@@ -165,9 +166,16 @@ async def _run_scan_job(
 
     all_findings: list[Finding] = []
 
+    seed_urls: list[str] = []
+    try:
+        seed_urls = await discover_seed_urls(http_client, target.origin)
+    except Exception as exc:
+        logger.debug("Discovery skipped for %s: %s", target.origin, exc)
+
     try:
         crawler = SafeCrawler(
             target_url,
+            seed_urls=seed_urls,
             max_pages=20,
             max_depth=2,
             concurrency=3,

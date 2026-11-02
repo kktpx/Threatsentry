@@ -93,7 +93,9 @@ class SafeCrawler:
         resolver: Resolver | None = None,
         client: httpx.AsyncClient | None = None,
         allow_local: bool = False,
+        seed_urls: list[str] | None = None,
     ) -> None:
+        self.seed_urls = seed_urls or []
         self.allow_local = allow_local
         self.target = normalize_target(base_url, allow_local=allow_local)
         self.origin = self.target.origin
@@ -113,6 +115,8 @@ class SafeCrawler:
         # Seed the crawler with normalized initial URL
         normalized_root = self.target.url
         queue.put_nowait((normalized_root, 0))
+        for seed in self.seed_urls:
+            queue.put_nowait((seed, 1))
 
         client = self._custom_client or httpx.AsyncClient(
             timeout=self.timeout,
