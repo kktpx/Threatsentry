@@ -112,3 +112,37 @@ def test_lab_mode_unknown_value_falls_back_to_all(monkeypatch) -> None:
     client = TestClient(app)
     assert client.get("/search?q=x").status_code == 200
     assert client.get("/products?id=1").status_code == 200
+
+
+def test_token_pages_do_not_reflect_markup(monkeypatch) -> None:
+    monkeypatch.setenv("LAB_MODE", "sqli")
+    client = TestClient(app)
+    payload = "<script>alert(1)</script>"
+    assert payload not in client.get("/set-token", params={"token": payload}).text
+    assert payload not in client.get("/").text
+    client.get("/set-token", params={"token": "ts_lab_token_demo"})
+
+
+def _passive_categories(response) -> set[str]:
+    from backend.scanner.passive.cookie_checks import evaluate_cookies
+    from backend.scanner.passive.header_checks import evaluate_security_headers
+    from backend.scanner.passive.http_checks import evaluate_server_banners
+
+    findings = [
+        *evaluate_security_headers(response.headers),
+        *evaluate_server_banners(response.headers),
+        *evaluate_cookies(response.headers.get_list("set-cookie"), is_https=False),
+    ]
+    return {f.category for f in findings}
+
+
+def test_single_vulnerability_modes_have_no_passive_findings(monkeypatch) -> None:
+    for mode, path in (("xss", "/vulnerable/search?q=x"), ("sqli", "/vulnerable/products?id=1")):
+        monkeypatch.setenv("LAB_MODE", mode)
+        assert _passive_categories(TestClient(app).get(path)) == set(), mode
+
+
+def test_all_mode_keeps_passive_findings(monkeypatch) -> None:
+    monkeypatch.setenv("LAB_MODE", "all")
+    categories = _passive_categories(TestClient(app).get("/"))
+    assert {"MISSING_CSP", "MISSING_HSTS", "SERVER_BANNER_LEAKAGE", "COOKIE_MISSING_HTTPONLY"} <= categories

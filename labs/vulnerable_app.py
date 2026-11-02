@@ -19,6 +19,18 @@ XSS_PREFIXES = ("/search", "/vulnerable/search", "/safe/search")
 SQLI_PREFIXES = ("/products", "/vulnerable/products", "/safe/products")
 
 
+HARDENED_HEADERS = {
+    "Content-Security-Policy": "frame-ancestors 'none'",
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Permissions-Policy": "geolocation=(), camera=(), microphone=()",
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Cross-Origin-Resource-Policy": "same-origin",
+}
+
+
 def lab_mode() -> str:
     mode = os.environ.get("LAB_MODE", "all").lower()
     return mode if mode in {"xss", "sqli"} else "all"
@@ -69,14 +81,22 @@ async def restrict_to_lab_mode(request: Request, call_next):
 async def add_passive_vulnerabilities(request: Request, call_next):
     """Adds realistic passive security oversights (banner disclosure, missing headers, insecure cookies)."""
     response: Response = await call_next(request)
-    # 1. Server banner disclosure
-    response.headers["Server"] = "VulnerableLab/1.0 (Ubuntu 22.04)"
-    response.headers["X-Powered-By"] = "PHP/8.1.0-Simulated"
+    if lab_mode() == "all":
+        # 1. Server banner disclosure
+        response.headers["Server"] = "VulnerableLab/1.0 (Ubuntu 22.04)"
+        response.headers["X-Powered-By"] = "PHP/8.1.0-Simulated"
 
-    # 2. Insecure cookie flag omission (no Secure, no HttpOnly, no SameSite)
-    response.headers.append("Set-Cookie", "lab_session=guest_abc12345; Path=/")
+        # 2. Insecure cookie flag omission (no Secure, no HttpOnly, no SameSite)
+        response.headers.append("Set-Cookie", "lab_session=guest_abc12345; Path=/")
 
-    # Deliberately omits Content-Security-Policy, HSTS, X-Frame-Options, etc.
+        # Deliberately omits Content-Security-Policy, HSTS, X-Frame-Options, etc.
+    else:
+        # Single-vulnerability demos: the target is otherwise configured sensibly so that only the
+        # demonstrated flaw (plus plain HTTP on localhost) shows up. The CSP does not restrict
+        # inline scripts, otherwise the XSS payload would be blocked in the browser.
+        for name, value in HARDENED_HEADERS.items():
+            response.headers[name] = value
+        response.headers.append("Set-Cookie", "lab_session=guest_abc12345; Path=/; HttpOnly; SameSite=Lax")
 
     # 3. Every lab response is visibly marked as test-only
     response.headers["X-ThreatSentry-Lab"] = LAB_MARKER
@@ -132,7 +152,7 @@ def set_verification_token(token: str = Query(default="", alias="token")):
     </head>
     <body>
         <h2>Verification Token Updated!</h2>
-        <p>Active Token: <code>threatsentry-verification={_in_memory_token}</code></p>
+        <p>Active Token: <code>threatsentry-verification={html.escape(_in_memory_token, quote=True)}</code></p>
         <p><a href="/" style="color: #38bdf8;">&larr; Back to Lab Home</a></p>
     </body>
     </html>
@@ -201,9 +221,9 @@ def home():
             <!-- Verification Card -->
             <div class="card">
                 <h2>1. Website Verification Token</h2>
-                <p>Current active challenge token: <code>threatsentry-verification={_in_memory_token}</code></p>
+                <p>Current active challenge token: <code>threatsentry-verification={html.escape(_in_memory_token, quote=True)}</code></p>
                 <form action="/set-token" method="GET" style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
-                    <input type="text" name="token" placeholder="Paste token from ThreatSentry (e.g. ts_verify_...)" value="{_in_memory_token}" required />
+                    <input type="text" name="token" placeholder="Paste token from ThreatSentry (e.g. ts_verify_...)" value="{html.escape(_in_memory_token, quote=True)}" required />
                     <button type="submit">Update Token</button>
                 </form>
             </div>

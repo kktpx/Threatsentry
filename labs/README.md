@@ -25,6 +25,12 @@ Every HTML response carries a visible `TEST / BENCHMARK ONLY` banner and an
 | `npm run lab:sqli` | 8082 | `/products`, `/vulnerable/products`, `/safe/products` only |
 | `npm run lab` | 8080 | everything |
 
+In these two modes the target is otherwise configured sensibly (security headers, `HttpOnly`/`SameSite`
+cookie, no server banner), so a scan shows essentially only the demonstrated flaw plus
+`UNENCRYPTED_HTTP` (localhost is plain HTTP). The CSP is `frame-ancestors 'none'` only: a script-blocking
+CSP would stop the XSS payload from running in the browser. `npm run lab` (mode `all`) keeps the
+deliberately sloppy headers/cookies/banners so every passive check has something to report.
+
 The other feature returns 404 and its card is hidden from the home page. Run both commands in
 separate terminals to demo them side by side. All three bind to `127.0.0.1` only.
 
