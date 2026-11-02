@@ -78,3 +78,37 @@ def test_safe_endpoints_resist_payloads() -> None:
     assert "sqlite3" not in sqli.text
     vulnerable = client.get("/vulnerable/search", params={"q": "<script>alert(1)</script>"})
     assert "<script>alert(1)</script>" in vulnerable.text
+
+
+def test_lab_mode_xss_only(monkeypatch) -> None:
+    monkeypatch.setenv("LAB_MODE", "xss")
+    client = TestClient(app)
+    assert client.get("/vulnerable/search?q=x").status_code == 200
+    assert client.get("/safe/search?q=x").status_code == 200
+    for path in ("/products?id=1", "/vulnerable/products?id=1", "/safe/products?id=1"):
+        assert client.get(path).status_code == 404
+    home = client.get("/").text
+    assert "Reflected XSS" in home and "SQL Injection" not in home
+
+
+def test_lab_mode_sqli_only(monkeypatch) -> None:
+    monkeypatch.setenv("LAB_MODE", "sqli")
+    client = TestClient(app)
+    assert client.get("/vulnerable/products?id=1").status_code == 200
+    for path in ("/search?q=x", "/vulnerable/search?q=x", "/safe/search?q=x"):
+        assert client.get(path).status_code == 404
+    home = client.get("/").text
+    assert "SQL Injection" in home and "Reflected XSS" not in home
+
+
+def test_lab_mode_disabled_response_is_still_marked_test_only(monkeypatch) -> None:
+    monkeypatch.setenv("LAB_MODE", "xss")
+    response = TestClient(app).get("/products?id=1")
+    assert response.headers["X-ThreatSentry-Lab"] == "TEST / BENCHMARK ONLY"
+
+
+def test_lab_mode_unknown_value_falls_back_to_all(monkeypatch) -> None:
+    monkeypatch.setenv("LAB_MODE", "bogus")
+    client = TestClient(app)
+    assert client.get("/search?q=x").status_code == 200
+    assert client.get("/products?id=1").status_code == 200
