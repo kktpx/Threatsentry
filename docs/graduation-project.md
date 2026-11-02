@@ -12,7 +12,7 @@ ThreatSentry is a Deep Scan web vulnerability scanner that only scans targets wh
 
 - React + TypeScript dashboard with Supabase authentication, website inventory, ownership verification, scan history and findings.
 - FastAPI backend with scan jobs, cancellation, rate limiting, scoring and re-scan comparison (`NEW` / `UNCHANGED`, fixed count).
-- Scanner: crawler, HTTP/header/cookie/exposure/TLS/DNS passive checks, SQLi and reflected XSS probes.
+- Scanner: crawler, HTTP/header/cookie/exposure/TLS/DNS/technology passive checks, SQLi and reflected XSS probes.
 - ML pipeline and packaged model (`ml.md`).
 - Controlled lab and benchmark (`benchmark.md`).
 
@@ -24,4 +24,4 @@ ThreatSentry is a Deep Scan web vulnerability scanner that only scans targets wh
 
 ## Future work
 
-Train on independent real traffic; add technology detection; move scans to a worker queue with shared rate limiting; scan history comparison view in the UI; benchmark against third-party vulnerable applications.
+Train on independent real traffic; move scans to a worker queue with shared rate limiting; scan history comparison view in the UI; benchmark against third-party vulnerable applications.

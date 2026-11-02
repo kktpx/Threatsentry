@@ -25,6 +25,7 @@ The user serves `https://<origin>/.well-known/threatsentry.txt` containing `thre
 | Cookies | `cookie_checks.py` | Missing Secure / HttpOnly / SameSite |
 | Exposure | `exposure.py` | Stack traces, directory listings |
 | TLS | `tls_checks.py` | Invalid, mismatched or expired certificate, expiry within 14 days, protocol TLS 1.1 or older. Connects to the IP that passed SSRF validation. |
+| Technology | `technology.py` | Infers web servers, frameworks and CMSs from headers, `meta generator`, asset paths, script names and cookie **names** (never values). Header/generator hits are `LIKELY`, weaker hits `POTENTIAL`; nothing is `CONFIRMED`. Reported as `INFO` once per origin, so it does not affect the score. |
 | DNS | `dns_checks.py` | Missing/permissive SPF, missing DMARC, DMARC `p=none`, missing CAA. Mail findings need an MX record; these are low severity or informational. |
 
 ## Active detection
@@ -38,4 +39,4 @@ Every scan runs under a hard time limit (`SCAN_MAX_DURATION_SECONDS`, default 60
 
 ## Not implemented
 
-Technology fingerprinting and a dedicated discovery module are not implemented.
+A dedicated discovery module (robots.txt, sitemap, common paths) is not implemented; discovery is done by the crawler only.
