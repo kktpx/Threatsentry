@@ -50,6 +50,36 @@ async def run_scan_job(
     website_id: str,
     database: Any,
     *,
+    max_duration_seconds: float | None = None,
+    **kwargs: Any,
+) -> None:
+    """Runs a scan under a hard time limit; a scan that exceeds it is failed with SCAN_TIMEOUT."""
+    limit = max_duration_seconds if max_duration_seconds is not None else get_settings().scan_max_duration_seconds
+    try:
+        await asyncio.wait_for(
+            _run_scan_job(scan_id, target_url, website_id, database, **kwargs),
+            timeout=limit,
+        )
+    except asyncio.TimeoutError:
+        logger.warning("Scan %s exceeded the %ss time limit", scan_id, limit)
+        _active_cancellations.discard(scan_id)
+        try:
+            database.table("scan_jobs").update({
+                "status": ScanStatus.FAILED.value,
+                "finished_at": datetime.now(UTC).isoformat(),
+                "error_code": "SCAN_TIMEOUT",
+                "error_message_safe": "The scan exceeded the maximum allowed duration.",
+            }).eq("id", scan_id).execute()
+        except Exception as exc:
+            logger.warning("Failed to record timeout for scan %s: %s", scan_id, exc)
+
+
+async def _run_scan_job(
+    scan_id: str,
+    target_url: str,
+    website_id: str,
+    database: Any,
+    *,
     user_id: str | None = None,
     resolver: Resolver | None = None,
     client: httpx.AsyncClient | None = None,

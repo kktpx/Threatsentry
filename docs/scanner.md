@@ -34,8 +34,8 @@ The user serves `https://<origin>/.well-known/threatsentry.txt` containing `thre
 
 ## Cancellation and limits
 
-Cancelling sets the job to `CANCELLED`; the runner checks between stages and between pages. The scanner uses a distinct `ThreatSentry-Scanner` User-Agent and does not follow redirects automatically.
+Every scan runs under a hard time limit (`SCAN_MAX_DURATION_SECONDS`, default 600). A scan that exceeds it is marked `FAILED` with error code `SCAN_TIMEOUT`. Cancelling sets the job to `CANCELLED`; the runner checks between stages and between pages. The scanner uses a distinct `ThreatSentry-Scanner` User-Agent and does not follow redirects automatically.
 
 ## Not implemented
 
-Technology fingerprinting, a dedicated discovery module and a maximum scan duration are not implemented.
+Technology fingerprinting and a dedicated discovery module are not implemented.

@@ -24,4 +24,4 @@ ThreatSentry is a Deep Scan web vulnerability scanner that only scans targets wh
 
 ## Future work
 
-Train on independent real traffic; add technology detection and a scan time limit; move scans to a worker queue with shared rate limiting; scan history comparison view in the UI; benchmark against third-party vulnerable applications.
+Train on independent real traffic; add technology detection; move scans to a worker queue with shared rate limiting; scan history comparison view in the UI; benchmark against third-party vulnerable applications.
