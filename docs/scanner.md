@@ -24,7 +24,7 @@ The user serves `https://<origin>/.well-known/threatsentry.txt` containing `thre
 | HTTP | `http_checks.py` | Plain HTTP, `Server` / `X-Powered-By` version leakage |
 | Headers | `header_checks.py` | Missing CSP, HSTS, X-Frame-Options, … |
 | Cookies | `cookie_checks.py` | Missing Secure / HttpOnly / SameSite |
-| Exposure | `exposure.py` | Stack traces, directory listings |
+| Exposure | `exposure.py` | Stack traces, directory listings, source map references (`sourceMappingURL`), mixed content on HTTPS pages (active: script/iframe/stylesheet/form = MEDIUM; passive: images/media = LOW), HTTPS pages that redirect to plain HTTP |
 | TLS | `tls_checks.py` | Invalid, mismatched or expired certificate, expiry within 14 days, protocol TLS 1.1 or older. Connects to the IP that passed SSRF validation. |
 | Technology | `technology.py` | Infers web servers, frameworks and CMSs from headers, `meta generator`, asset paths, script names and cookie **names** (never values). Header/generator hits are `LIKELY`, weaker hits `POTENTIAL`; nothing is `CONFIRMED`. Reported as `INFO` once per origin, so it does not affect the score. |
 | DNS | `dns_checks.py` | Missing/permissive SPF, missing DMARC, DMARC `p=none`, missing CAA. Mail findings need an MX record; these are low severity or informational. |

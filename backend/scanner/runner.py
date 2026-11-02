@@ -259,6 +259,7 @@ async def _run_scan_job(
                 body=resp.text[:65536],
                 status_code=resp.status_code,
                 raw_cookies=cookie_headers,
+                location=resp.headers.get("location"),
             )
             all_findings.extend(passive_res)
         except Exception as exc:
