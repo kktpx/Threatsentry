@@ -3,15 +3,15 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "dev": "concurrently --kill-others-on-fail --names api,web --prefix-colors blue,magenta \".\\.venv\\Scripts\\python.exe -m uvicorn backend.main:app --reload --port 8000\" \"npm --prefix apps/dashboard run dev\"",
-    "dev:api": ".\\.venv\\Scripts\\python.exe -m uvicorn backend.main:app --reload --port 8000",
+    "dev": "concurrently --kill-others-on-fail --names api,web --prefix-colors blue,magenta \"node scripts/py.js -m uvicorn backend.main:app --reload --port 8000\" \"npm --prefix apps/dashboard run dev\"",
+    "dev:api": "node scripts/py.js -m uvicorn backend.main:app --reload --port 8000",
     "dev:web": "npm --prefix apps/dashboard run dev",
-    "benchmark": ".\\.venv\\Scripts\\python.exe -m labs.benchmark",
-    "lab": ".\\.venv\\Scripts\\python.exe -m uvicorn labs.vulnerable_app:app --reload --port 8080",
-    "lab:xss": ".\\.venv\\Scripts\\python.exe -m labs.vulnerable_app --mode xss --port 8081",
-    "lab:sqli": ".\\.venv\\Scripts\\python.exe -m labs.vulnerable_app --mode sqli --port 8082",
-    "lab:share": ".\\.venv\\Scripts\\python.exe -m labs.vulnerable_app --host 0.0.0.0 --port 8080",
-    "dev:all": "concurrently --kill-others-on-fail --names api,web,lab --prefix-colors blue,magenta,green \".\\.venv\\Scripts\\python.exe -m uvicorn backend.main:app --reload --port 8000\" \"npm --prefix apps/dashboard run dev\" \".\\.venv\\Scripts\\python.exe -m uvicorn labs.vulnerable_app:app --reload --port 8080\""
+    "benchmark": "node scripts/py.js -m labs.benchmark",
+    "lab": "node scripts/py.js -m uvicorn labs.vulnerable_app:app --reload --port 8080",
+    "lab:xss": "node scripts/py.js -m labs.vulnerable_app --mode xss --port 8081",
+    "lab:sqli": "node scripts/py.js -m labs.vulnerable_app --mode sqli --port 8082",
+    "lab:share": "node scripts/py.js -m labs.vulnerable_app --host 0.0.0.0 --port 8080",
+    "dev:all": "concurrently --kill-others-on-fail --names api,web,lab --prefix-colors blue,magenta,green \"node scripts/py.js -m uvicorn backend.main:app --reload --port 8000\" \"npm --prefix apps/dashboard run dev\" \"node scripts/py.js -m uvicorn labs.vulnerable_app:app --reload --port 8080\""
   },
   "devDependencies": {
     "concurrently": "^9.2.1"
